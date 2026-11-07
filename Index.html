@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Labirinto do Impossível</title>
+  <style>
+    :root {
+      --bg: #0d1321;
+      --panel: #141d31;
+      --panel-2: #1c2740;
+      --wall: #2d3f66;
+      --wall-alt: #3d5684;
+      --floor: #0d1b2a;
+      --ball: #ffcc66;
+      --ball-shadow: rgba(255, 204, 102, 0.28);
+      --exit: #7ef29a;
+      --text: #edf3ff;
+      --muted: #a9badc;
+      --danger: #ff6b6b;
+      --success: #7ef29a;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #1b2d4c 0%, var(--bg) 52%);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      min-height: 100dvh;
+    }
+
+    .game {
+      width: 100%;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: clamp(10px, 2vh, 20px) clamp(10px, 2vw, 24px);
+    }
+
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 12px;
+      flex: 0 0 auto;
+      margin-bottom: 10px;
+    }
+
+    .title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #7ef29a;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      letter-spacing: -0.05em;
+    }
+
+    .timer-box {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 9px 12px;
+      min-width: 118px;
+      text-align: center;
+    }
+
+    .timer-label {
+      display: block;
+      font-size: 0.66rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    #timer {
+      display: block;
+      margin-top: 4px;
+      font-size: clamp(1.15rem, 3vw, 1.7rem);
+      font-weight: 700;
+      color: var(--ball);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .board-wrap {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.18);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: var(--floor);
+      touch-action: none;
+      user-select: none;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(7, 11, 19, 0.76);
+      padding: 22px;
+      transition: opacity 0.2s ease;
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .panel {
+      max-width: 310px;
+      width: min(100%, 310px);
+      background: rgba(20, 29, 49, 0.96);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 18px;
+      text-align: center;
+      padding: 24px 18px 18px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.28);
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      letter-spacing: -0.04em;
+    }
+
+    .panel p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.96rem;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #8ef0ad, #57d98a);
+      color: #102115;
+      font-weight: 800;
+      font-size: 1rem;
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .help {
+      flex: 0 0 auto;
+      margin: 8px 6px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    @media (max-height: 480px) {
+      .game { padding-top: 6px; padding-bottom: 6px; }
+      .hud { margin-bottom: 5px; }
+      .eyebrow { display: none; }
+      h1 { font-size: 1.15rem; }
+      .timer-box { padding: 4px 9px; }
+      .help { margin-top: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="game">
+    <div class="hud">
+      <div class="title-wrap">
+        <p class="eyebrow">Desafio de sobrevivência</p>
+        <h1>Labirinto do Impossível</h1>
+      </div>
+      <div class="timer-box">
+        <span class="timer-label">Tempo</span>
+        <span id="timer">03:00</span>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <canvas id="mazeCanvas" width="500" height="500" aria-label="Labirinto"></canvas>
+      <div id="overlay" class="overlay">
+        <div class="panel">
+          <h2 id="overlayTitle">Pronto?</h2>
+          <p id="overlayText">Encontre a saída neste labirinto insano antes que os 3 minutos acabem.</p>
+          <button id="startButton" type="button">Começar</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="help">Toque na bolinha e arraste. No computador, use o mouse ou as setas.</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('mazeCanvas');
+    const ctx = canvas.getContext('2d');
+    const timerEl = document.getElementById('timer');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlayTitle');
+    const overlayText = document.getElementById('overlayText');
+    const startButton = document.getElementById('startButton');
+
+    const cols = 41;
+    const rows = 41;
+    const totalTime = 3 * 60;
+    let timeLeft = totalTime;
+    let maze = [];
+    let player = { x: 1.5, y: 1.5 };
+    let exit = { x: cols - 2.5, y: rows - 2.5 };
+    let gameRunning = false;
+    let dragging = false;
+    let lastPointer = { x: 0, y: 0 };
+    let animationFrame = 0;
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function buildMaze() {
+      const generated = Array.from({ length: rows }, () => Array(cols).fill(1));
+      const stack = [[1, 1]];
+      generated[1][1] = 0;
+
+      while (stack.length) {
+        const [x, y] = stack[stack.length - 1];
+        const directions = shuffle([
+          [2, 0],
+          [-2, 0],
+          [0, 2],
+          [0, -2]
+        ]);
+
+        let moved = false;
+
+        for (const [dx, dy] of directions) {
+          const nx = x + dx;
+          const ny = y + dy;
+
+          if (nx <= 0 || ny <= 0 || nx >= cols - 1 || ny >= rows - 1) continue;
+          if (generated[ny][nx] !== 1) continue;
+
+          generated[y + dy / 2][x + dx / 2] = 0;
+          generated[ny][nx] = 0;
+          stack.push([nx, ny]);
+          moved = true;
+          break;
+        }
+
+        if (!moved) {
+          stack.pop();
+        }
+      }
+
+      maze = generated;
+      player = { x: 1.5, y: 1.5 };
+      exit = { x: cols - 1.5, y: rows - 1.5 };
+    }
+
+    function isWallAt(x, y) {
+      const cellX = Math.floor(x);
+      const cellY = Math.floor(y);
+
+      if (cellX < 0 || cellY < 0 || cellX >= cols || cellY >= rows) return true;
+      return maze[cellY][cellX] === 1;
+    }
+
+    function collides(x, y, radius = 0.26) {
+      const checks = [
+        [x, y],
+        [x + radius, y],
+        [x - radius, y],
+        [x, y + radius],
+        [x, y - radius],
+        [x + radius, y + radius],
+        [x - radius, y + radius],
+        [x + radius, y - radius],
+        [x - radius, y - radius]
+      ];
+
+      return checks.some(([px, py]) => isWallAt(px, py));
+    }
+
+    function drawMaze() {
+      const cell = Math.min(canvas.width / cols, canvas.height / rows);
+      const offsetX = (canvas.width - cell * cols) / 2;
+      const offsetY = (canvas.height - cell * rows) / 2;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0d1b2a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const px = offsetX + x * cell;
+          const py = offsetY + y * cell;
+
+          if (maze[y][x] === 1) {
+            ctx.fillStyle = '#2d3f66';
+            ctx.fillRect(px, py, cell, cell);
+          } else {
+            ctx.fillStyle = '#0d1b2a';
+            ctx.fillRect(px, py, cell, cell);
+          }
+        }
+      }
+
+      const exitX = offsetX + exit.x * cell;
+      const exitY = offsetY + exit.y * cell;
+      const exitR = cell * 0.18;
+
+      ctx.beginPath();
+      ctx.fillStyle = '#7ef29a';
+      ctx.arc(exitX, exitY, exitR, 0, Math.PI * 2);
+      ctx.fill();
+
+      const ballX = offsetX + player.x * cell;
+      const ballY = offsetY + player.y * cell;
+      const ballR = cell * 0.22;
+
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(255, 204, 102, 0.25)';
+      ctx.arc(ballX + 3, ballY + 5, ballR + 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.fillStyle = '#ffcc66';
+      ctx.arc(ballX, ballY, ballR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function endGame(win) {
+      gameRunning = false;
+      cancelAnimationFrame(animationFrame);
+
+      if (win) {
+        overlayTitle.textContent = 'Você saiu!';
+        overlayText.textContent = 'Você encontrou a saída antes que os 3 minutos acabassem.';
+      } else {
+        overlayTitle.textContent = 'Tempo acabou!';
+        overlayText.textContent = 'A bolinha não alcançou a saída a tempo.';
+      }
+
+      startButton.textContent = win ? 'Jogar de novo' : 'Tentar novamente';
+      overlay.classList.remove('hidden');
+    }
+
+    function updateTimer(delta) {
+      timeLeft -= delta;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        timerEl.textContent = formatTime(timeLeft);
+        endGame(false);
+        return;
+      }
+      timerEl.textContent = formatTime(timeLeft);
+    }
+
+    function checkWin() {
+      const dist = Math.hypot(player.x - exit.x, player.y - exit.y);
+      if (dist < 0.7) {
+        endGame(true);
+      }
+    }
+
+    function tryMove(nextX, nextY) {
+      if (!gameRunning) return;
+
+      const targetX = Math.min(Math.max(nextX, 0.5), cols - 1.5);
+      const targetY = Math.min(Math.max(nextY, 0.5), rows - 1.5);
+      const deltaX = targetX - player.x;
+      const deltaY = targetY - player.y;
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(deltaX), Math.abs(deltaY)) / 0.12));
+
+      for (let step = 0; step < steps; step++) {
+        const tentativeX = player.x + deltaX / steps;
+        const tentativeY = player.y + deltaY / steps;
+
+        if (!collides(tentativeX, player.y, 0.26)) player.x = tentativeX;
+        if (!collides(player.x, tentativeY, 0.26)) player.y = tentativeY;
+      }
+
+      checkWin();
+      drawMaze();
+    }
+
+    function onPointerDown(event) {
+      if (!gameRunning) return;
+      const rect = canvas.getBoundingClientRect();
+      const cell = Math.min(canvas.width / cols, canvas.height / rows);
+      const offsetX = (canvas.width - cell * cols) / 2;
+      const offsetY = (canvas.height - cell * rows) / 2;
+      const pointerX = (event.clientX - rect.left) * canvas.width / rect.width;
+      const pointerY = (event.clientY - rect.top) * canvas.height / rect.height;
+      const ballX = offsetX + player.x * cell;
+      const ballY = offsetY + player.y * cell;
+      const grabRadius = Math.max(cell * 1.8, 28);
+
+      if (Math.hypot(pointerX - ballX, pointerY - ballY) > grabRadius) return;
+      dragging = true;
+      lastPointer = { x: event.clientX, y: event.clientY };
+      canvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }
+
+    function onPointerMove(event) {
+      if (!dragging || !gameRunning) return;
+
+      const dx = event.clientX - lastPointer.x;
+      const dy = event.clientY - lastPointer.y;
+      lastPointer = { x: event.clientX, y: event.clientY };
+
+      const cell = Math.min(canvas.width / cols, canvas.height / rows);
+      tryMove(player.x + dx / cell, player.y + dy / cell);
+    }
+
+    function onPointerUp() {
+      dragging = false;
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(rect.width));
+      canvas.height = Math.max(1, Math.floor(rect.height));
+      drawMaze();
+    }
+
+    function startGame() {
+      buildMaze();
+      timeLeft = totalTime;
+      timerEl.textContent = formatTime(timeLeft);
+      overlay.classList.add('hidden');
+      gameRunning = true;
+      dragging = false;
+
+      const loop = (timestamp) => {
+        if (!gameRunning) return;
+        if (!startGame.lastTs) startGame.lastTs = timestamp;
+        const delta = (timestamp - startGame.lastTs) / 1000;
+        startGame.lastTs = timestamp;
+        updateTimer(delta);
+        drawMaze();
+        animationFrame = requestAnimationFrame(loop);
+      };
+
+      startGame.lastTs = 0;
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(loop);
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (!gameRunning) return;
+
+      const moveStep = 0.28;
+      const key = event.key.toLowerCase();
+
+      if (key === 'arrowleft' || key === 'a') tryMove(player.x - moveStep, player.y);
+      if (key === 'arrowright' || key === 'd') tryMove(player.x + moveStep, player.y);
+      if (key === 'arrowup' || key === 'w') tryMove(player.x, player.y - moveStep);
+      if (key === 'arrowdown' || key === 's') tryMove(player.x, player.y + moveStep);
+    });
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('resize', resizeCanvas);
+    startButton.addEventListener('click', startGame);
+
+    buildMaze();
+    resizeCanvas();
+    timerEl.textContent = formatTime(timeLeft);
+    drawMaze();
+  </script>
+</body>
+</html>
